@@ -1,0 +1,1852 @@
+# HG changeset patch
+# User Anna Palicheva <anna.palicheva@parexel.com>
+# Date 1645450731 18000
+#      Mon Feb 21 08:38:51 2022 -0500
+# Node ID 69d832a56b0a755b4dcdd12302138fd9ce44caf0
+# Parent  ee50f7e79b5f6b1344b5311994727e4b114227be
+SILENTMODE
+
+diff -r ee50f7e79b5f -r 69d832a56b0a Installer/Common/Script Files/vistaCommon.rul
+--- a/Installer/Common/Script Files/vistaCommon.rul	Thu Feb 17 09:10:36 2022 -0500
++++ b/Installer/Common/Script Files/vistaCommon.rul	Mon Feb 21 08:38:51 2022 -0500
+@@ -65,29 +65,11 @@
+ #define INSIGHT_RENDERING_510_AMYUNI_COMPANY "Liquent, Inc."
+ #define INSIGHT_RENDERING_510_AMYUNI_LICENSE "07EFCDAB010001000FCDAF06397BAFDD1CF2F3844CE7FF44605805860E34784E98C6B6123E00ABE766867C933D2C596E66389D30DA3F50F8D56952B6"
+ 
+-#define PRODUCT_MENU_FOLDER_STR "ID_STRING43"
+-#define BUTTON_CLOSE	9
+-#define BUTTON_CANCEL	2
+-#define BUTTON_NEXT		1
+-#define BUTTON_BACK		12  
+-#define BUTTON_CHECK_ORACLE_DB                  9986
+-#define VISTA_FEATURES_FRAMEWORK_CHK			1204
+-#define VISTA_FEATURES_ADMIN_TOOLS_CHK			1205
+-
+-#define VISTA_LEAVE_AS_STANDALONE_RADIO_BUTTON_ID    1222
+-#define VISTA_DO_JOIN_VISTA_DOMAIN_RADIO_BUTTON_ID	 1223	
+-#define VISTA_LEAVE_AS_STANDALONE    "0"
+-#define VISTA_DO_JOIN_VISTA_DOMAIN   "1"
+ 	
+ // MSDE supported as SQL Server but MSDE is no longer installed
+ // by this installer						          
+-//#define	DATABASETYPE_MSDE		"0"
+-//#define	DATABASETYPE_MSACCESS	"1"
+-//#define	DATABASETYPE_SQLSERVER	"2" 
+-// Oracle8 no longer supported (do not reuse this number)
+-//#define	DATABASETYPE_ORACLE8	"3"
+ #define	DATABASETYPE_ORACLE9	"4" // Also Oracle 10, Oracle 11
+-//#define	DATABASETYPE_DB2		"5"
++
+  
+ #define PROPERTY_SERVICE_NAME			"VistaServiceName" 
+ #define PROPERTY_JOIN_DOMAIN_VALUE		"VistaJoinDomainValue"
+@@ -142,9 +124,6 @@
+ 	prototype VOID InstallHelper.KillProcesses();
+ 	 
+ 	// ----- Script function prototypes -----
+-    prototype INT VistaUserDialog();
+-    prototype INT VistaLicenseDialog();
+-    prototype VOID TrimString(BYREF STRING);
+     prototype STRING GetComputerName();
+ 	prototype BOOL GetWindowsUserInfo(BYREF STRING, BYREF STRING); 
+     prototype VOID GetInstallationSettings(BYVAL STRING);
+@@ -174,16 +153,11 @@
+ 	prototype VOID FinishInstalling(BOOL);
+ 	prototype STRING GetIRInstallationPath(STRING);
+ 	prototype VOID InitializeCHFGuidsArrays();
+-	prototype STRING GenerateCHFIssFile(STRING);
+-	prototype STRING GenerateGAIssFile(STRING);
+-	prototype STRING GenerateIssFile(STRING, STRING);
+ 	prototype VOID GetBitnessRelatedInstallPaths(STRING, BYREF STRING, BYREF STRING);
+ 	prototype VOID ProcessDefaultPath(BYREF STRING, BYREF STRING);
+ 
+ 	prototype int Msi.MsiGetPropertyA(int, byval string, byref string, byref int);
+ 
+-    prototype INT VistaOracleDialog();
+-
+     prototype BOOL CreateVistaShortcuts(byval STRING);
+     prototype BOOL CreateVistaShortcutHelper(byval STRING, byval STRING, byval STRING, byval STRING);
+ 
+@@ -219,625 +193,7 @@
+     BOOL   g_bDMSFileSystemFeature;
+     STRING g_szShortcutsFolder; 
+     STRING g_szLogFileName;
+-
+-///////////////////////////////////////////////////////////////////////////////
+-//
+-//  FUNCTION:   VistaUserDialog
+-//
+-//  REMARKS:    Collects Vista user information.
+-//
+-///////////////////////////////////////////////////////////////////////////////
+-function INT VistaUserDialog()
+-	STRING szDlg;
+-	BOOL   bDone;
+-	INT    nId;
+-	HWND   hwndDlg;
+-	HWND   hwndNext;
+-	HWND   hwndText;
+-    STRING szUserDomain, szUserName, szUserPassword, szUserConfirmPassword;
+-    STRING szCurrentUserDomain, szCurrentUserName;
+-     
+-    LONG   lBufferSize; 
+-begin 
+-    lBufferSize = 0;
+-    MsiGetProperty(ISMSI_HANDLE, PROPERTY_USER_DOMAIN, szUserDomain, lBufferSize);
+-	lBufferSize++;
+-	Resize(szUserDomain, lBufferSize);
+-	MsiGetProperty(ISMSI_HANDLE, PROPERTY_USER_DOMAIN, szUserDomain, lBufferSize);
+-	
+-    lBufferSize = 0;
+-    MsiGetProperty(ISMSI_HANDLE, PROPERTY_USER_NAME, szUserName, lBufferSize);
+-	lBufferSize++;
+-	Resize(szUserName, lBufferSize);
+-	MsiGetProperty(ISMSI_HANDLE,PROPERTY_USER_NAME, szUserName, lBufferSize); 
+-	
+-	if (szUserName = "") then 
+-		GetWindowsUserInfo(szCurrentUserDomain, szCurrentUserName); 
+-		MsiSetProperty(ISMSI_HANDLE, PROPERTY_USER_DOMAIN, szCurrentUserDomain);
+-		MsiSetProperty(ISMSI_HANDLE, PROPERTY_USER_NAME, szCurrentUserName);
+-	endif;
+-
+-	szDlg = "VistaUserDialog"; 
+-	
+-	if (!bSdInit) then
+-		SdInit();
+-	endif;	   
+-	
+-	if (EzDefineDialog(szDlg, ISUSER, szDlg, 0) < 0) then
+-	 	MessageBox("Error defining user dialog box.", INFORMATION);
+-	 	abort;
+-	endif;
+-	
+-	bDone = FALSE;
+-	
+-	while(!bDone)
+-		nId = WaitOnDialog(szDlg);
+-		
+-		if (nId = BUTTON_BACK || nId = BUTTON_NEXT) then 
+-			// Capture what was entered
+-		   	CtrlGetText(szDlg, 301, szUserDomain);
+-		   	CtrlGetText(szDlg, 302, szUserName);
+-		   	CtrlGetText(szDlg, 303, szUserPassword);
+-		   	CtrlGetText(szDlg, 304, szUserConfirmPassword);
+-		   	TrimString(szUserDomain);
+-		   	TrimString(szUserName);
+-		   	TrimString(szUserPassword);
+-		   	TrimString(szUserConfirmPassword);
+-			MsiSetProperty(ISMSI_HANDLE, PROPERTY_USER_DOMAIN, szUserDomain);
+-			MsiSetProperty(ISMSI_HANDLE, PROPERTY_USER_NAME, szUserName);
+-			MsiSetProperty(ISMSI_HANDLE, PROPERTY_USER_PASSWORD, szUserPassword);
+-			MsiSetProperty(ISMSI_HANDLE, PROPERTY_USER_CONFIRM_PASSWORD, szUserConfirmPassword);
+-		endif;
+-		
+-		switch(nId)
+-			case DLG_INIT:
+-				hwndDlg = CmdGetHwndDlg(szDlg); 
+-				
+-				hwndNext = GetDlgItem(hwndDlg, BUTTON_NEXT); 
+-				 
+-			    lBufferSize = 0;
+-			    MsiGetProperty(ISMSI_HANDLE, PROPERTY_USER_DOMAIN, szUserDomain, lBufferSize);
+-				lBufferSize++;
+-				Resize(szUserDomain, lBufferSize);
+-				MsiGetProperty(ISMSI_HANDLE, PROPERTY_USER_DOMAIN, szUserDomain, lBufferSize); 
+-				
+-			    lBufferSize = 0;
+-			    MsiGetProperty(ISMSI_HANDLE, PROPERTY_USER_NAME, szUserName, lBufferSize);
+-				lBufferSize++;
+-				Resize(szUserName, lBufferSize);
+-				MsiGetProperty(ISMSI_HANDLE, PROPERTY_USER_NAME, szUserName, lBufferSize); 
+-				
+-			    lBufferSize = 0;
+-			    MsiGetProperty(ISMSI_HANDLE, PROPERTY_USER_PASSWORD, szUserPassword, lBufferSize);
+-				lBufferSize++;
+-				Resize(szUserPassword, lBufferSize);
+-				MsiGetProperty(ISMSI_HANDLE, PROPERTY_USER_PASSWORD, szUserPassword, lBufferSize); 
+-				
+-			    lBufferSize = 0;
+-			    MsiGetProperty(ISMSI_HANDLE, PROPERTY_USER_CONFIRM_PASSWORD, szUserConfirmPassword, lBufferSize);
+-				lBufferSize++;
+-				Resize(szUserConfirmPassword, lBufferSize);
+-				MsiGetProperty(ISMSI_HANDLE, PROPERTY_USER_CONFIRM_PASSWORD, szUserConfirmPassword, lBufferSize); 
+-				
+-				hwndText = GetDlgItem(hwndDlg, 301);
+-				SetWindowText(hwndText, szUserDomain);    
+-				hwndText = GetDlgItem(hwndDlg, 302);
+-				SetWindowText(hwndText, szUserName);    
+-				hwndText = GetDlgItem(hwndDlg, 303);
+-				SetWindowText(hwndText, szUserPassword); 
+-				hwndText = GetDlgItem(hwndDlg, 304);
+-				SetWindowText(hwndText, szUserConfirmPassword); 
+-				
+-				if (szUserName != "" && szUserPassword != "" && szUserConfirmPassword != "") then 
+-					EnableWindow(hwndNext, TRUE);
+-				else
+-					EnableWindow(hwndNext, FALSE); 
+-				endif;
+-				
+-			   	CtrlSelectText(szDlg, 301);
+-				
+-			case BUTTON_CLOSE:
+-				Do(EXIT);
+-				
+-			case BUTTON_CANCEL:
+-				Do(EXIT);
+-				
+-			case BUTTON_NEXT:
+-				nId = NEXT;
+-				bDone = TRUE; 
+-				
+-				if (szUserPassword != szUserConfirmPassword) then
+-					MessageBox("Password confirmation failed.", WARNING);
+-					bDone = FALSE; 
+-				else 				
+-					if (InstallHelper.IsUserValid(ISMSI_HANDLE) = 0) then 
+-					 	MessageBox("Invalid Windows user/password specified.", WARNING);					 	
+-						bDone = FALSE;
+-					endif;
+-				endif;
+-				                                				
+-			case BUTTON_BACK:
+-				nId = BACK;
+-				bDone = TRUE;
+-			
+-			// User domain field	
+-			case 301:
+-				if (CtrlGetSubCommand(szDlg) == EDITBOX_CHANGE) then
+-				   CtrlGetText(szDlg, 301, szUserDomain);
+-				   TrimString(szUserDomain);
+-				endif;
+-
+-			// User name field	
+-			case 302:
+-				if (CtrlGetSubCommand(szDlg) == EDITBOX_CHANGE) then
+-				   	CtrlGetText(szDlg, 302, szUserName);
+-				   	TrimString(szUserName);
+-					if (szUserName != "" && szUserPassword != "" && szUserConfirmPassword != "") then 
+-						EnableWindow(hwndNext, TRUE);
+-					else
+-						EnableWindow(hwndNext, FALSE); 
+-					endif;	 
+-				endif; 
+-				
+-			// User password field	
+-			case 303:
+-				if (CtrlGetSubCommand(szDlg) == EDITBOX_CHANGE) then
+-				   	CtrlGetText(szDlg, 303, szUserPassword);
+-				    TrimString(szUserPassword);
+-					if (szUserName != "" && szUserPassword != "" && szUserConfirmPassword != "") then 
+-						EnableWindow(hwndNext, TRUE); 
+-					else
+-						EnableWindow(hwndNext, FALSE);
+-					endif;	
+-				endif; 
+-				
+-			// User confirm password field	
+-			case 304:
+-				if (CtrlGetSubCommand(szDlg) == EDITBOX_CHANGE) then
+-				   	CtrlGetText(szDlg, 304, szUserConfirmPassword);
+-				    TrimString(szUserConfirmPassword);
+-					if (szUserName != "" && szUserPassword != "" && szUserConfirmPassword != "") then 
+-						EnableWindow(hwndNext, TRUE); 
+-					else
+-						EnableWindow(hwndNext, FALSE);
+-					endif;	
+-				endif;
+-				
+-		endswitch;
+-		
+-	endwhile;
+-	
+-	EndDialog(szDlg);
+-	
+-	ReleaseDialog(szDlg);
+-	            
+-	return nId;            
+-end;  
+-
+-///////////////////////////////////////////////////////////////////////////////
+-//
+-//  FUNCTION:   VistaLicenseDialog
+-//
+-//  REMARKS:    Collects Vista license file name.
+-//
+-///////////////////////////////////////////////////////////////////////////////
+-function INT VistaLicenseDialog()
+-	STRING szDlg;
+-	BOOL   bDone;
+-	INT    nId;
+-	HWND   hwndDlg;
+-	HWND   hwndNext;
+-	HWND   hwndText;
+-    STRING szLicenseFile; 
+-    STRING szModuleFileName;
+-    STRING szTempLicenseFile; 
+-    STRING szReason;
+-    LONG   lBufferSize;
+-    LONG   nResult;
+-    STRING szInstallHelperDLL;
+-    STRING szError;
+-begin    
+-    // Set module name to use for validating license version
+-	szModuleFileName = SRCDIR + "Common64\\Liquent\\BusinessServiceManager.exe";
+-	MsiSetProperty(ISMSI_HANDLE, PROPERTY_MODULE_NAME, szModuleFileName); 
+-
+-	szDlg = "VistaLicenseDialog"; 
+-	
+-	if (!bSdInit) then
+-		SdInit();
+-	endif;	   
+-	
+-	if (EzDefineDialog(szDlg, ISUSER, szDlg, 0) < 0) then
+-	 	MessageBox("Error defining license dialog box.", INFORMATION);
+-	 	abort;
+-	endif;
+-	
+-	bDone = FALSE;
+-	
+-	while(!bDone)
+-		nId = WaitOnDialog(szDlg);
+-		
+-		if (nId = BUTTON_BACK || nId = BUTTON_NEXT) then 
+-			// Capture what was entered
+-		   	CtrlGetText(szDlg, 301, szLicenseFile);
+-		   	TrimString(szLicenseFile);
+-			MsiSetProperty(ISMSI_HANDLE, PROPERTY_LICENSE_FILE, szLicenseFile); 
+-		endif;
+-		
+-		switch(nId)
+-			case DLG_INIT:
+-				hwndDlg = CmdGetHwndDlg(szDlg); 
+-				
+-				hwndNext = GetDlgItem(hwndDlg, BUTTON_NEXT);
+-				
+-			    lBufferSize = 0;
+-			    MsiGetProperty(ISMSI_HANDLE, PROPERTY_LICENSE_FILE, szLicenseFile, lBufferSize);
+-				lBufferSize++;
+-				Resize(szLicenseFile, lBufferSize);
+-				MsiGetProperty(ISMSI_HANDLE, PROPERTY_LICENSE_FILE, szLicenseFile, lBufferSize); 
+-				
+-				hwndText = GetDlgItem(hwndDlg, 301);
+-				SetWindowText(hwndText, szLicenseFile);    
+-				
+-				if (szLicenseFile != "") then 
+-					EnableWindow(hwndNext, TRUE); 
+-				else
+-					EnableWindow(hwndNext, FALSE); 
+-				endif;
+-				
+-			   	CtrlSelectText(szDlg, 301);
+-				 
+-			case BUTTON_CLOSE:
+-				Do(EXIT);
+-				
+-			case BUTTON_CANCEL:
+-				Do(EXIT);
+-				
+-			case BUTTON_NEXT:
+-				nId = NEXT;
+-				bDone = TRUE; 
+-				
+-				if (FileExists(szLicenseFile) == FALSE) then
+-					MessageBox("License file does not exist.", WARNING);
+-					bDone = FALSE; 
+-				elseif (!InstallHelper.ValidVistaLicenseFile(ISMSI_HANDLE)) then 
+-				    lBufferSize = 0;
+-				    MsiGetProperty(ISMSI_HANDLE, PROPERTY_ERROR_MESSAGE, szError, lBufferSize);
+-					lBufferSize++;
+-					Resize(szError, lBufferSize);
+-					MsiGetProperty(ISMSI_HANDLE, PROPERTY_ERROR_MESSAGE, szError, lBufferSize); 
+-				
+-					MessageBox(szError, WARNING);
+-					bDone = FALSE; 
+-				endif;
+-				                                				
+-			case BUTTON_BACK:
+-				nId = BACK;
+-				bDone = TRUE;
+-			
+-			// License file name field	
+-			case 301:
+-				if (CtrlGetSubCommand(szDlg) == EDITBOX_CHANGE) then
+-				   	CtrlGetText(szDlg, 301, szLicenseFile);
+-				   	TrimString(szLicenseFile); 
+-				   
+-					if (szLicenseFile != "") then 
+-						EnableWindow(hwndNext, TRUE); 
+-					else
+-						EnableWindow(hwndNext, FALSE); 
+-					endif;	
+-				endif;
+-			
+-			// Browse license file button	
+-			case 302:
+-				// Prompt user to select license file 
+-				if (InstallHelper.SelectVistaLicenseFile(ISMSI_HANDLE)) then
+-				    lBufferSize = 0;
+-				    MsiGetProperty(ISMSI_HANDLE, PROPERTY_LICENSE_FILE, szLicenseFile, lBufferSize);
+-					lBufferSize++;
+-					Resize(szLicenseFile, lBufferSize);
+-					MsiGetProperty(ISMSI_HANDLE, PROPERTY_LICENSE_FILE, szLicenseFile, lBufferSize); 
+-			   	 		
+-				   	TrimString(szLicenseFile);
+-		   	 		
+-		   	 		if (szLicenseFile != "") then 
+-						if (!InstallHelper.ValidVistaLicenseFile(ISMSI_HANDLE)) then 
+-						    lBufferSize = 0;
+-						    MsiGetProperty(ISMSI_HANDLE, PROPERTY_ERROR_MESSAGE, szError, lBufferSize);
+-							lBufferSize++;
+-							Resize(szError, lBufferSize);
+-							MsiGetProperty(ISMSI_HANDLE, PROPERTY_ERROR_MESSAGE, szError, lBufferSize); 
+-						
+-							MessageBox(szError, WARNING);
+-						else
+-							hwndText = GetDlgItem(hwndDlg, 301);
+-							SetWindowText(hwndText, szLicenseFile);    
+-			   	 		
+-							EnableWindow(hwndNext, TRUE);
+-						endif;	 
+-		   	 		endif; 
+-		   	 	endif;	
+-			
+-		endswitch;
+-		
+-	endwhile;
+-
+-	EndDialog(szDlg);
+-	
+-	ReleaseDialog(szDlg);
+-	            
+-	return nId;            
+-end;              
+-
+-
+-///////////////////////////////////////////////////////////////////////////////
+-//
+-//  FUNCTION:   VistaOracleDialog
+-//
+-//  REMARKS:    Collects Oracle database information.
+-//
+-///////////////////////////////////////////////////////////////////////////////
+-function INT VistaOracleDialog()
+-	STRING szDlg;
+-	BOOL   bDone;
+-	INT    nId;
+-	HWND   hwndDlg;
+-	HWND   hwndNext;
+-	HWND   hwndText;
+-    STRING szService, szUser, szPassword, szConfirmPassword; 
+-    LONG   lBufferSize;
+-begin 
+-    lBufferSize = 0;
+-    MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_SERVICE, szService, lBufferSize);
+-	lBufferSize++;
+-	Resize(szService, lBufferSize);
+-	MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_SERVICE, szService, lBufferSize); 
+-	
+-    lBufferSize = 0;
+-    MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_USER, szUser, lBufferSize);
+-	lBufferSize++;
+-	Resize(szUser, lBufferSize);
+-	MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_USER, szUser, lBufferSize); 
+-	
+-	if (szUser = "") then 
+-		MsiSetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_USER, "vista1");
+-	endif;
+-	
+-	MsiSetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_TYPE, DATABASETYPE_ORACLE9);
+-
+-	szDlg = "VistaOracleDialog"; 
+-	
+-	if (!bSdInit) then
+-		SdInit();
+-	endif;	   
+-	
+-	if (EzDefineDialog(szDlg, ISUSER, szDlg, 0) < 0) then
+-	 	MessageBox("Error defining Oracle database dialog box.", INFORMATION);
+-	 	abort;
+-	endif;
+-	
+-	bDone = FALSE;
+-	
+-	while(!bDone)
+-		nId = WaitOnDialog(szDlg); 
+-		
+-		if (nId = BUTTON_BACK || nId = BUTTON_NEXT) then 
+-			// Capture what was entered 
+-		   	CtrlGetText(szDlg, 301, szService);
+-		   	CtrlGetText(szDlg, 302, szUser);
+-		   	CtrlGetText(szDlg, 303, szPassword);   
+-	   		CtrlGetText(szDlg, 304, szConfirmPassword);   
+-		   	TrimString(szService);
+-		   	TrimString(szUser);
+-		   	TrimString(szPassword); 
+-		   	TrimString(szConfirmPassword); 
+-			MsiSetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_SERVICE, szService);
+-			MsiSetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_USER, szUser);
+-			MsiSetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_PASSWORD, szPassword);
+-			MsiSetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_CONFIRM_PASSWORD, szConfirmPassword);
+-		endif;
+-		
+-		switch(nId)
+-			case DLG_INIT:
+-				hwndDlg = CmdGetHwndDlg(szDlg); 
+-				
+-				hwndNext = GetDlgItem(hwndDlg, BUTTON_NEXT);
+-				 
+-			    lBufferSize = 0;
+-			    MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_SERVICE, szService, lBufferSize);
+-				lBufferSize++;
+-				Resize(szService, lBufferSize);
+-				MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_SERVICE, szService, lBufferSize);
+-				
+-			    lBufferSize = 0;
+-			    MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_USER, szUser, lBufferSize);
+-				lBufferSize++;
+-				Resize(szUser, lBufferSize);
+-				MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_USER, szUser, lBufferSize);
+-				
+-			    lBufferSize = 0;
+-			    MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_PASSWORD, szPassword, lBufferSize);
+-				lBufferSize++;
+-				Resize(szPassword, lBufferSize);
+-				MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_PASSWORD, szPassword, lBufferSize); 
+-				
+-			    lBufferSize = 0;
+-			    MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_CONFIRM_PASSWORD, szConfirmPassword, lBufferSize);
+-				lBufferSize++;
+-				Resize(szConfirmPassword, lBufferSize);
+-				MsiGetProperty(ISMSI_HANDLE, PROPERTY_DATABASE_CONFIRM_PASSWORD, szConfirmPassword, lBufferSize); 
+-				
+-				hwndText = GetDlgItem(hwndDlg, 301);
+-				SetWindowText(hwndText, szService);    
+-				hwndText = GetDlgItem(hwndDlg, 302);
+-				SetWindowText(hwndText, szUser);
+-				hwndText = GetDlgItem(hwndDlg, 303);
+-				SetWindowText(hwndText, szPassword); 
+-				hwndText = GetDlgItem(hwndDlg, 304);
+-				SetWindowText(hwndText, szConfirmPassword); 
+-				
+-				if (szService != "" && szUser != "") then 
+-					EnableWindow(hwndNext, TRUE); 
+-				else
+-					EnableWindow(hwndNext, FALSE); 
+-				endif;
+-				
+-			   	CtrlSelectText(szDlg, 301);
+-				
+-			case BUTTON_CLOSE:
+-				Do(EXIT);
+-				
+-			case BUTTON_CANCEL:
+-				Do(EXIT);
+-				
+-			case BUTTON_NEXT:
+-				nId = NEXT;
+-				bDone = TRUE; 
+-				
+-				if (szPassword != szConfirmPassword) then
+-					MessageBox("Password confirmation failed.", WARNING);
+-					bDone = FALSE;
+-				endif;
+-				                                				
+-			case BUTTON_BACK:
+-				nId = BACK;
+-				bDone = TRUE;
+-			    
+-			case BUTTON_CHECK_ORACLE_DB:     
+-				//Check that the passwords match
+-				if (szPassword != szConfirmPassword) then
+-					MessageBox("Password confirmation failed.", WARNING);
+-					bDone = FALSE;
+-				else     
+-					
+-					if (MODE != SILENTMODE) then
+-	  					SdShowMsg("Checking the Oracle database connection. Please wait...", TRUE);
+-	  				endif;	
+-	                //Check the oracle database connection
+-				    if(InstallHelper.CheckOracleDbConnection(szService,szUser,szPassword) == 0) then
+-						if (MODE != SILENTMODE) then
+-		  					SdShowMsg("", FALSE);
+-		  				endif;
+-		  		    	MessageBox("The Oracle database connection check has failed. Please verify the settings you have entered.", WARNING);
+-						bDone = FALSE;
+-					else
+-						if (MODE != SILENTMODE) then
+-		  					SdShowMsg("", FALSE);
+-		  				endif;        
+-		  				MessageBox("The Oracle database connection check has succeeded.", INFORMATION);
+-				    endif;     
+-				endif;
+-			// Service name field	
+-			case 301:
+-				if (CtrlGetSubCommand(szDlg) == EDITBOX_CHANGE) then
+-				   	CtrlGetText(szDlg, 301, szService);
+-				   	TrimString(szService);
+-					if (szService != "" && szUser != "") then 
+-						EnableWindow(hwndNext, TRUE); 
+-					else
+-						EnableWindow(hwndNext, FALSE);
+-					endif;	 
+-				endif; 
+-				
+-			// User name field	
+-			case 302:
+-				if (CtrlGetSubCommand(szDlg) == EDITBOX_CHANGE) then
+-				   	CtrlGetText(szDlg, 302, szUser);
+-				    TrimString(szUser);
+-					if (szService != "" && szUser != "") then 
+-						EnableWindow(hwndNext, TRUE); 
+-					else
+-						EnableWindow(hwndNext, FALSE); 
+-					endif;	
+-				endif;
+-				                 
+-			// User password field	                 
+-			case 303:
+-				if (CtrlGetSubCommand(szDlg) == EDITBOX_CHANGE) then
+-				   	CtrlGetText(szDlg, 303, szPassword);
+-				    TrimString(szPassword);
+-					if (szService != "" && szUser != "") then 
+-						EnableWindow(hwndNext, TRUE); 
+-					else
+-						EnableWindow(hwndNext, FALSE); 
+-					endif;	
+-				endif; 
+-				
+-			// User confirm password field	
+-			case 304:
+-				if (CtrlGetSubCommand(szDlg) == EDITBOX_CHANGE) then
+-				   	CtrlGetText(szDlg, 304, szConfirmPassword);
+-				    TrimString(szConfirmPassword);
+-					if (szService != "" && szUser != "") then 
+-						EnableWindow(hwndNext, TRUE); 
+-					else
+-						EnableWindow(hwndNext, FALSE);
+-					endif;	
+-				endif;				
+-		endswitch;
+-		
+-	endwhile;    
+-	
+-	//Write to the ini file here. String value is in scope of this dialogue 
+-	//WriteProfString (SUPPORTDIR + "Vista.ini", "Database", "Machine", szMachine ); 
+-	//WriteProfString (SUPPORTDIR + "Vista.ini", "Database", "Catalog", szCatalog ); 
+-	WriteProfString (SUPPORTDIR + "Vista.ini", "Database", "Service", szService ); 
+-	WriteProfString (SUPPORTDIR + "Vista.ini", "Database", "User", szUser ); 
+-	WriteProfString (SUPPORTDIR + "Vista.ini", "Database", "Password", szPassword ); 
+-	//WriteProfString (SUPPORTDIR + "Vista.ini", "Database", "Share", szShare ); 
+-		
+-	EndDialog(szDlg);
+-	
+-	ReleaseDialog(szDlg);
+-	            
+-	return nId;            
+-end;
+-
+-///////////////////////////////////////////////////////////////////////////////
+-//
+-//  FUNCTION:   TrimString
+-//
+-//  REMARKS:    Removes leading and trailing spaces from string and returns string.
+-//
+-///////////////////////////////////////////////////////////////////////////////
+-function VOID TrimString(svStr)
+-	STRING	svTemp;
+-	INT		i, iLen;
+-	BOOL	bDone;
+-	
+-begin
+-	iLen = StrLengthChars(svStr);
+-	if (iLen = 0) then
+-		return;      	
+-	endif; 
+-
+-	// Remove leading spaces
+-	i = 0;
+-	bDone = FALSE;
+-	while((i < iLen) && (!bDone))
+-		if ((svStr[i] = '\t') || (svStr[i] = 32)) then
+-			i = i + 1;
+-		else
+-			bDone = TRUE;	
+-		endif;
+-	endwhile;
+-	 
+-	// Get length minus leading spaces 
+-	iLen = StrSub(svStr, svStr, i, iLen-i);
+-	
+-	// Remove trailing spaces
+-	bDone = FALSE;
+-	while((iLen > 0) && (!bDone))
+-		if ((svStr[iLen-1] = '\t') || (svStr[iLen-1] = 32)) then
+-			iLen = iLen -1;
+-		else
+-			bDone = TRUE;
+-		endif;		
+-	endwhile;
+-	              
+-	// Null terminate              
+-	svStr[iLen] = 0;
+-end;
++    
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ //
+@@ -962,32 +318,7 @@
+   	endcatch;
+ end;    
+ 
+-///////////////////////////////////////////////////////////////////////////////
+-//
+-//  FUNCTION:   GetWindowsUserInfo
+-//
+-//  REMARKS:    Get current Windows user domain and name.
+-//
+-///////////////////////////////////////////////////////////////////////////////
+-function BOOL GetWindowsUserInfo(svDomain, svUser)
+-	OBJECT objNetwork;
+-	STRING szLogMessage;
+-begin 
+-  	try
+-  		set objNetwork = CreateObject("WScript.Network");
+-  		svDomain = objNetwork.UserDomain;
+-  		svUser = objNetwork.UserName;
+-  		return TRUE;
+-  	catch 
+-		Sprintf(szLogMessage, "Unable to get Windows user info.\n" +
+-				"Error Number: %d\nError Description: %s",
+-				Err.Number, Err.Description);
+-		Log("GetWindowsUserInfo", __FILE__, __LINE__, szLogMessage);
+-  		svDomain = "";
+-  		svUser = "";
+-  		return FALSE;
+-  	endcatch;
+-end;  
++ 
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+ //
+@@ -1178,18 +509,11 @@
+ begin   
+   	try   
+ 		szCommandLine = "-s \"Liquent PDF Creator\" -n \""+ szAmyuniLicenseToCompany + "\" -c \"" + szAmyuniLicense + "\"";
+-		if (MODE != SILENTMODE) then
+-	  		SdShowMsg("Installing Liquent PDF Creator, please wait.", TRUE);
+-	  	endif;	
++		
+ 	  	if (LaunchAppAndWait(szPath ^ "install.exe", szCommandLine, LAAW_OPTION_WAIT | LAAW_OPTION_HIDDEN) < 0) then  
+ 			Log("InstallAmyuniPrinter", __FILE__, __LINE__, "Unable to install Liquent PDF Creator.");
+-	  		if (MODE != SILENTMODE) then
+-	        	MessageBox("Unable to install Liquent PDF Creator.", WARNING);
+-	        endif;	
+ 	  	endif;
+-		if (MODE != SILENTMODE) then
+-	  		SdShowMsg("", FALSE);
+-	  	endif;	
++		
+ 	  	LaunchAppAndWait("rundll32", "printui.dll,PrintUIEntry /Xs /n \"Liquent PDF Creator\" Portname \"NUL:\"", LAAW_OPTION_WAIT | LAAW_OPTION_HIDDEN);
+   		
+   		return TRUE;
+@@ -1212,9 +536,7 @@
+ 	STRING szLogMessage, szAmyuniDriverFilePath;
+ begin
+ 	try
+-		if (MODE != SILENTMODE) then
+-			SdShowMsg("Uninstalling Liquent PDF Creator, please wait.", TRUE);
+-		endif;
++		
+ 		if (LaunchAppAndWait("rundll32", "printui.dll,PrintUIEntry /q /dl /n \"Liquent PDF Creator\"", LAAW_OPTION_WAIT | LAAW_OPTION_HIDDEN) != ISERR_SUCCESS) then
+ 			Log("UninstallAmyuniPrinter", __FILE__, __LINE__, "Unable to uninstall Liquent PDF Creator printer.");
+ 		endif;
+@@ -1242,11 +564,7 @@
+ 			endif;
+ 			FileDelete(szAmyuniDriverFilePath);
+ 		endif;
+-		Enable(WOW64FSREDIRECTION);
+-		
+-		if (MODE != SILENTMODE) then
+-			SdShowMsg("", FALSE);
+-		endif;
++		Enable(WOW64FSREDIRECTION);	
+ 
+ 		return TRUE;
+ 	catch
+@@ -1594,10 +912,7 @@
+     	Sprintf(szLogMessage, "Unable to configure repository.\n" +
+ 				"Error Number: %d\nError Description: %s",
+ 				Err.Number, Err.Description);
+-		Log("ConfigureVista", __FILE__, __LINE__, szLogMessage);
+-  		if (MODE != SILENTMODE) then
+-	    	SprintfBox(MB_OK | MB_ICONEXCLAMATION, "Error", szLogMessage); 
+-	    endif;				
++		Log("ConfigureVista", __FILE__, __LINE__, szLogMessage);  					
+     	return FALSE;			        	
+ 	endcatch;   
+ 	
+@@ -1624,10 +939,7 @@
+     	Sprintf(szLogMessage, "Unable to set BusinessServiceManager permissions.\n" +
+ 				"Error Number: %d\nError Description: %s",
+ 				Err.Number, Err.Description);
+-		Log("SetVistaPermissions", __FILE__, __LINE__, szLogMessage);
+-  		if (MODE != SILENTMODE) then
+-	    	SprintfBox(MB_OK | MB_ICONEXCLAMATION, "Error", szLogMessage); 
+-	    endif;
++		Log("SetVistaPermissions", __FILE__, __LINE__, szLogMessage);  		
+     	return FALSE;			        	
+     endcatch;
+     
+@@ -1649,24 +961,15 @@
+ begin
+     try       
+     	if (g_szDatabaseConnectString != "") then
+-			switch(g_szDatabaseType)
+-				case DATABASETYPE_ORACLE9: 
+-					objDomainInstall.InstallDatabase(4, g_szDatabaseConnectString, "", FALSE);
+-			endswitch;
++			objDomainInstall.InstallDatabase(DATABASETYPE_ORACLE9, g_szDatabaseConnectString, "", FALSE);
+     	else
+-			switch(g_szDatabaseType)
+-				case DATABASETYPE_ORACLE9:
+-					objDomainInstall.InstallOracleDatabase(g_szDatabaseService, g_szDatabaseUser, g_szDatabasePassword); 
+-			endswitch; 
++			objDomainInstall.InstallOracleDatabase(g_szDatabaseService, g_szDatabaseUser, g_szDatabasePassword);
+ 		endif;	
+     catch
+     	Sprintf(szLogMessage, "Unable to install Vista database.\n" +
+ 				"Error Number: %d\nError Description: %s",
+ 				Err.Number, Err.Description);
+-		Log("InstallVistaDatabase", __FILE__, __LINE__, szLogMessage);
+-  		if (MODE != SILENTMODE) then
+-	    	SprintfBox(MB_OK | MB_ICONEXCLAMATION, "Error", szLogMessage); 
+-	    endif;				
++		Log("InstallVistaDatabase", __FILE__, __LINE__, szLogMessage);  						
+     	return FALSE;			         	
+     endcatch;
+     
+@@ -1687,10 +990,7 @@
+ begin
+ 	try
+ 		if (!objDomainInstall.ValidLicenseFile(g_szLicenseFile, szInvalidReason)) then
+-			Log("InstallVistaLicenseFile", __FILE__, __LINE__, szInvalidReason);
+-			if (MODE != SILENTMODE) then
+-		 		MessageBox(szInvalidReason, WARNING);
+-		 	endif;	
++			Log("InstallVistaLicenseFile", __FILE__, __LINE__, szInvalidReason);			
+ 		else
+ 			objDomainInstall.InstallLicenseFile(g_szLicenseFile);
+ 		endif;	 
+@@ -1698,10 +998,7 @@
+ 		Sprintf(szLogMessage, "Unable to install Vista license file '%s'.\n" +
+ 				"Error Number: %d\nError Description: %s",
+ 				g_szLicenseFile, Err.Number, Err.Description);
+-		Log("InstallVistaLicenseFile", __FILE__, __LINE__, szLogMessage);
+-  		if (MODE != SILENTMODE) then
+-	    	SprintfBox(MB_OK | MB_ICONEXCLAMATION, "Error", szLogMessage); 
+-	    endif;				
++		Log("InstallVistaLicenseFile", __FILE__, __LINE__, szLogMessage);  						
+     	return FALSE;			
+ 	endcatch;
+ 	
+@@ -1733,18 +1030,9 @@
+ 		
+ 		SetVistaPermissions(objDomainInstall);
+ 		ProcessDefaultPath(szInstallDirX86, szInstallDirX64);
+-	  	// See if installing framework
+-	  	//if (FeatureIsItemSelected(MEDIA, FEATURE_FRAMEWORK) == TRUE) then
+-		    // Configure 
+-			if (MODE != SILENTMODE) then
+-		  		SdShowMsg("Configuring InSight Rendering, please wait.", TRUE);
+-		  	endif;
+ 
+ 		  	if (LaunchAppAndWait(INSTALLDIR + "BusinessServiceServer.exe", "-Service", LAAW_OPTION_WAIT) < 0) then 
+-				Log("OnFirstUIAfter", __FILE__, __LINE__, "Unable to register BusinessServiceServer as an NT Service.");
+-		  		if (MODE != SILENTMODE) then
+-		        	MessageBox("Unable to register BusinessServiceServer as an NT Service.", WARNING);
+-		        endif;	
++				Log("OnFirstUIAfter", __FILE__, __LINE__, "Unable to register BusinessServiceServer as an NT Service.");		  		
+ 		  	endif; 
+ 
+ 		    MsiSetProperty(ISMSI_HANDLE, PROPERTY_USER_DOMAIN, g_szUserDomain);
+@@ -1756,10 +1044,7 @@
+ 		  	if (InstallVistaDatabase(objDomainInstall)) then
+ 			  	if (InstallVistaLicenseFile(objDomainInstall)) then 
+ 			  		if (ConfigureVista()) then  
+-						if (!StartNTService("BusinessServiceServer")) then 
+-							if (MODE != SILENTMODE) then
+-						    	SprintfBox(MB_OK | MB_ICONEXCLAMATION, "Error", "Unable to start BusinessServiceServer."); 
+-						    endif;	
++						if (!StartNTService("BusinessServiceServer")) then							
+ 						endif; 
+ 			  		endif;	
+ 			  	endif;	
+@@ -1775,10 +1060,6 @@
+ 				ProcessDefaultPath(g_szPreviousInstallDir, g_szPreviousInstallDirX64);
+ 			endif; 			
+ 		endif;
+-
+-		if (MODE != SILENTMODE) then
+-	  		SdShowMsg("", FALSE);
+-	  	endif;
+ 	catch
+ 		Sprintf(szLogMessage, "Unexpected error occured.\n" +
+ 			"Error Number: %d\nError Description: %s", 
+@@ -1800,19 +1081,13 @@
+ begin
+ 	// Check that .NET 4.5.2 is installed on the target system
+ 	RegDBSetDefaultRoot(HKEY_LOCAL_MACHINE);
+-    if (RegDBGetKeyValueEx("Software\\Microsoft\\NET Framework Setup\\NDP\\v4\\Full", "Release", nvType, svDotNetReleaseVer, nvSize) < 0) then
+-		if (MODE != SILENTMODE) then
+-			MessageBox("InSight Rendering requires .NET Framework 4.5.2 or higher, but .NET 4.5.2 or higher is not installed. Install .NET 4.5.2 or higher, and then install InSight Rendering.", WARNING);
+-		endif;
++    if (RegDBGetKeyValueEx("Software\\Microsoft\\NET Framework Setup\\NDP\\v4\\Full", "Release", nvType, svDotNetReleaseVer, nvSize) < 0) then		
+ 		return FALSE;
+ 	endif;
+ 
+ 	StrToNum(nvDotNetReleaseVer, svDotNetReleaseVer);
+ 
+ 	if(nvDotNetReleaseVer < 379893) then
+-		if (MODE != SILENTMODE) then
+-			MessageBox("InSight Rendering requires .NET Framework 4.5.2 or higher, but .NET 4.5.2 or higher is not installed. Install .NET 4.5.2 or higher, and then install InSight Rendering.", WARNING);
+-		endif;
+ 		return FALSE;
+ 	endif;
+ 
+@@ -1835,18 +1110,9 @@
+ 	Sprintf(szErrorMessage, "Unable to install Visual Studio %s C++ redistributables.", szVersionName);
+ 	
+ 	// Install Visual Studio C++ redistributable
+-	if (MODE != SILENTMODE) then
+-  		SdShowMsg(szInstallMessage, TRUE);
+-  	endif;
+   	if (LaunchAppAndWait(SUPPORTDIR + szVCRedistributableFileName, "/q /norestart", LAAW_OPTION_WAIT | LAAW_OPTION_HIDDEN) < 0) then
+ 		Log("OnFirstUIBefore", __FILE__, __LINE__, szErrorMessage);
+-  		if (MODE != SILENTMODE) then
+-        	MessageBox(szErrorMessage, WARNING);
+-        endif;
+     endif;
+-	if (MODE != SILENTMODE) then
+-  		SdShowMsg("", FALSE);
+-  	endif;
+ end;
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+@@ -2071,25 +1337,9 @@
+         
+ //if a version of IR 4.0+ was found on the system
+ if (bFourOandAbovePresent == TRUE) then
+-	if (MODE != SILENTMODE) then    
+-		//SdShowMsg("Preparing to upgrade Liquent services, please wait.", TRUE);   
+-	endif; 
+-
+-	// Get install directory
+-	//svInstallDir = "";
+-	//nRootKey = HKEY_LOCAL_MACHINE;
+-	//nResult = RegDBSetDefaultRoot(nRootKey);
+-	//if (nResult = 0) then   
+-		//szRegKey = "SOFTWARE\\LIQUENT\\Infrastructure"; 
+-		//nvType = REGDB_STRING;
+-		//nResult = RegDBGetKeyValueEx(szRegKey, "InstallDir", nvType, svInstallDir, nvSize);
+-	//endif;
+ 			
+ 	if (!StopNTService("BusinessServiceServer")) then   
+-		Log("UninstallLiquentServices40andAbove", __FILE__, __LINE__, "Unable to stop BusinessServiceServer");
+-  		//if (MODE != SILENTMODE) then
+-	    	//SprintfBox(MB_OK | MB_ICONEXCLAMATION, "Error", "Unable to stop BusinessServiceServer."); 
+-	    //endif;
++		Log("UninstallLiquentServices40andAbove", __FILE__, __LINE__, "Unable to stop BusinessServiceServer");  		
+ 	endif;
+ 	
+ 	if (g_szPreviousInstallDir = "") then
+@@ -2099,10 +1349,7 @@
+ 	if (ServiceExistsService("BusinessServiceServer")) then
+ 		// Remove BusinessServiceServer as NT Service
+ 	  	if (LaunchAppAndWait(g_szPreviousInstallDir ^ "BusinessServiceServer.exe", "/unregserver", LAAW_OPTION_WAIT) < 0) then
+-			Log("UninstallLiquentServices40andAbove", __FILE__, __LINE__, "Unable to unregister BusinessServiceServer.");
+-	  		//if (MODE != SILENTMODE) then
+-	        	//MessageBox("Unable to unregister BusinessServiceServer.", WARNING);
+-	        //endif;	
++			Log("UninstallLiquentServices40andAbove", __FILE__, __LINE__, "Unable to unregister BusinessServiceServer.");	
+ 	  	endif; 
+ 	endif; 
+ 	
+@@ -2142,21 +1389,6 @@
+ 	RemoveSharedDllsFromRegistry(g_szPreviousInstallDir);
+ 	RemoveSharedDllsFromRegistry(g_szPreviousInstallDirX64);
+ 
+-	//try 
+-		//if (svInstallDir != "") then
+-			// Cleanup (i.e., files, folders, printers, etc.) 
+-			//InstallHelper.CleanupInstall(svInstallDir);
+-		//endif;	 
+-	//catch
+-		//Sprintf(szLogMessage, "Unable to perform uninstall cleanup.\n" +
+-				//"Error Number: %d\nError Description: %s",
+-				//Err.Number, Err.Description);
+-		//Log("UninstallLiquentServices30andAbove", __FILE__, __LINE__, szLogMessage);
+-	//endcatch;
+-	
+-	//if (MODE != SILENTMODE) then
+-  	//	SdShowMsg("", FALSE);
+-  	//endif;
+ endif;  	
+   	Log("UninstallLiquentServices40andAbove", __FILE__, __LINE__, "End");
+ end;
+@@ -2169,52 +1401,25 @@
+ //
+ ///////////////////////////////////////////////////////////////////////////////
+ function SilentLiquentServicesUninstall(szProductGUID)
+-    STRING argument, szLogMessage, szPath, szIssFilePath;
++    STRING argument, szLogMessage, szPath;
+ 	NUMBER nResult;
+ 
+ begin
+ 
+     if (IsProductInstalled(szProductGUID) == FALSE) then
+-		return;
++		return 0;
+ 	endif;
+-	
+-	if (szProductGUID = INSIGHT_RENDERING_400_PRODUCT_GUID ||
+-	    szProductGUID = INSIGHT_RENDERING_410_PRODUCT_GUID ||
+-	    szProductGUID = INSIGHT_RENDERING_420_PRODUCT_GUID ||
+-	    szProductGUID = INSIGHT_RENDERING_430_PRODUCT_GUID ||
+-	    szProductGUID = INSIGHT_RENDERING_440_PRODUCT_GUID ||
+-	    szProductGUID = INSIGHT_RENDERING_440_CHF1_PRODUCT_GUID) then
+-		szIssFilePath = GenerateGAIssFile(szProductGUID);  // for GA releases and post 4.4 CHFs
+-	else
+-		szIssFilePath = GenerateCHFIssFile(szProductGUID); // for CHFs
+-	endif;
+-    
+-    // Set command line arguments
+-	argument = " /s \"/f1" + szIssFilePath + "\"";
+ 
+-	szLogMessage = "argument=" + argument;
+-	Log("SilentLiquentServicesUninstall", __FILE__, __LINE__, szLogMessage);
+ 	
+ 	try
+ 		szPath = ProgramFilesFolder ^ "InstallShield Installation Information" ^ szProductGUID ^ "Setup.exe";
+-		nResult = LaunchAppAndWait(szPath, argument, LAAW_OPTION_WAIT);
+-
+-		// Cleanup
+-		if (szIssFilePath != "") then
+-			DeleteFile(szIssFilePath);
+-		endif;
++		nResult = LaunchAppAndWait(szPath, "", LAAW_OPTION_WAIT);
+ 	catch
+ 		Sprintf(szLogMessage, "Unable to uninstall Liquent services product.\n" +
+ 				"Error Number: %d\nError Description: %s",
+ 				Err.Number, Err.Description);
+ 		Log("SilentLiquentServicesUninstall", __FILE__, __LINE__, szLogMessage);
+-
+-		// Cleanup
+-		if (szIssFilePath != "") then
+-			DeleteFile(szIssFilePath);
+-		endif;
+-
+-		return;
++		return 0;
+ 	endcatch;
+ 
+ 	if (nResult < 0) then
+@@ -2259,10 +1464,7 @@
+ 		Sprintf(szLogMessage, "Unable to set help links.\n" +
+ 				"Error Number: %d\nError Description: %s",
+ 				Err.Number, Err.Description);
+-		Log("SetHelpLink", __FILE__, __LINE__, szLogMessage);
+-  		if (MODE != SILENTMODE) then
+-	    	SprintfBox(MB_OK | MB_ICONEXCLAMATION, "Error", szLogMessage); 
+-	    endif;				
++		Log("SetHelpLink", __FILE__, __LINE__, szLogMessage);  						
+     	return FALSE;			
+ 	endcatch;
+ 	
+@@ -2427,112 +1629,6 @@
+ 	endfor;
+ end;
+ 
+-///////////////////////////////////////////////////////////////////////////////
+-//
+-//  FUNCTION:   GenerateCHFIssFile
+-//
+-//  REMARKS:    Generates .iss file for silent uninstallation of CHF.
+-//
+-///////////////////////////////////////////////////////////////////////////////
+-function STRING GenerateCHFIssFile(guid)
+-	STRING szIssFileContent;
+-
+-begin
+-	szIssFileContent = "[" + guid + "-DlgOrder]\r\n";
+-	szIssFileContent = szIssFileContent + "Dlg0=" + guid + "-MessageBox-0\r\n";
+-	szIssFileContent = szIssFileContent + "Count=2\r\n";
+-	szIssFileContent = szIssFileContent + "Dlg1=" + guid + "-SdFinish-0\r\n";
+-	szIssFileContent = szIssFileContent + "[" + guid + "-MessageBox-0]\r\n";
+-	szIssFileContent = szIssFileContent + "Result=6\r\n";
+-	szIssFileContent = szIssFileContent + "[" + guid + "-SdFinish-0]\r\n";
+-	szIssFileContent = szIssFileContent + "Result=1\r\n";
+-	szIssFileContent = szIssFileContent + "bOpt1=0\r\n";
+-	szIssFileContent = szIssFileContent + "bOpt2=0\r\n";
+-
+-	return GenerateIssFile(guid, szIssFileContent);
+-end;
+-
+-///////////////////////////////////////////////////////////////////////////////
+-//
+-//  FUNCTION:   GenerateCHFIssFile
+-//
+-//  REMARKS:    Generates .iss file for silent uninstallation of GA release.
+-//
+-///////////////////////////////////////////////////////////////////////////////
+-function STRING GenerateGAIssFile(guid)
+-	STRING szIssFileContent;
+-
+-begin
+-	szIssFileContent = "[" + guid + "-DlgOrder]\r\n";
+-	szIssFileContent = szIssFileContent + "Dlg0=" + guid + "-SdWelcomeMaint-0\r\n";
+-	szIssFileContent = szIssFileContent + "Count=3\r\n";
+-	szIssFileContent = szIssFileContent + "Dlg1=" + guid + "-SprintfBox-0\r\n";
+-	szIssFileContent = szIssFileContent + "Dlg2=" + guid + "-SdFinish-0\r\n";
+-	szIssFileContent = szIssFileContent + "[" + guid + "-SdWelcomeMaint-0]\r\n";
+-	szIssFileContent = szIssFileContent + "Result=303\r\n";
+-	szIssFileContent = szIssFileContent + "[" + guid + "-SprintfBox-0]\r\n";
+-	szIssFileContent = szIssFileContent + "Result=1\r\n";
+-	szIssFileContent = szIssFileContent + "[" + guid + "-SdFinish-0]\r\n";
+-	szIssFileContent = szIssFileContent + "Result=1\r\n";
+-	szIssFileContent = szIssFileContent + "bOpt1=0\r\n";
+-	szIssFileContent = szIssFileContent + "bOpt2=0\r\n";
+-
+-	return GenerateIssFile(guid, szIssFileContent);
+-end;
+-
+-///////////////////////////////////////////////////////////////////////////////
+-//
+-//  FUNCTION:   GenerateIssFile
+-//
+-//  REMARKS:    Generates .iss file for silent uninstallation.
+-//
+-///////////////////////////////////////////////////////////////////////////////
+-function STRING GenerateIssFile(szGuid, szIssFileContent)
+-	STRING szIssFilePath, szIssFileName, szLogMessage;
+-	NUMBER nvFileHandle, nResult;
+-begin
+-
+-	szIssFileName = szGuid + ".iss";
+-	szIssFilePath = FOLDER_TEMP + szIssFileName;
+-
+-	// Set up file mode
+-	nResult = OpenFileMode(FILE_MODE_APPEND);
+-	if (nResult < 0) then
+-		Sprintf(szLogMessage, "Unable to set up file mode.\n" +
+-				"Error Number: %d\nError Description: %s",
+-				nResult, FormatMessage(nResult)); 
+-		Log("GenerateIssFile", __FILE__, __LINE__, szLogMessage);
+-	endif;
+-
+-	// Create a new file
+-	nResult = CreateFile(nvFileHandle, FOLDER_TEMP, szIssFileName);
+-	if (nResult < 0) then
+-		Sprintf(szLogMessage, "Unable to create a new file.\n" +
+-				"Error Number: %d\nError Description: %s",
+-				nResult, FormatMessage(nResult)); 
+-		Log("GenerateIssFile", __FILE__, __LINE__, szLogMessage);
+-	endif;
+-
+-	// Write content to a file
+-	nResult = WriteLine(nvFileHandle, szIssFileContent);
+-	if (nResult < 0) then
+-		Sprintf(szLogMessage, "Unable to write to a file.\n" +
+-				"Error Number: %d\nError Description: %s",
+-				nResult, FormatMessage(nResult)); 
+-		Log("GenerateIssFile", __FILE__, __LINE__, szLogMessage);
+-	endif;
+-
+-	// Close a file
+-	nResult = CloseFile(nvFileHandle);
+-	if (nResult < 0) then
+-		Sprintf(szLogMessage, "Unable to close a file.\n" +
+-				"Error Number: %d\nError Description: %s",
+-				nResult, FormatMessage(nResult)); 
+-		Log("GenerateIssFile", __FILE__, __LINE__, szLogMessage);
+-	endif;
+-
+-	return szIssFilePath;
+-end;
+ 
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+diff -r ee50f7e79b5f -r 69d832a56b0a Installer/LiquentEnterpriseServices.ism
+--- a/Installer/LiquentEnterpriseServices.ism	Thu Feb 17 09:10:36 2022 -0500
++++ b/Installer/LiquentEnterpriseServices.ism	Mon Feb 21 08:38:51 2022 -0500
+@@ -480,50 +480,22 @@
+ 		<col def="I4">ISControlId</col>
+ 		<col def="S255">ISBuildSourcePath</col>
+ 		<col def="S72">Binary_</col>
+-		<row><td>VistaLicenseDialog</td><td>Back</td><td>PushButton</td><td>195</td><td>286</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__VistaLicenseDialog_Back##</td><td/><td/><td>131072</td><td>12</td><td/><td/></row>
+-		<row><td>VistaLicenseDialog</td><td>Cancel</td><td>PushButton</td><td>400</td><td>284</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__VistaLicenseDialog_Cancel##</td><td/><td/><td>0</td><td>9</td><td/><td/></row>
+-		<row><td>VistaLicenseDialog</td><td>ControlId_2</td><td>PushButton</td><td>0</td><td>291</td><td>50</td><td>14</td><td>2</td><td/><td>##IDS__VistaLicenseDialog_C##</td><td/><td/><td>131072</td><td>2</td><td/><td/></row>
+-		<row><td>VistaLicenseDialog</td><td>DlgDesc</td><td>Text</td><td>18</td><td>15</td><td>213</td><td>19</td><td>65539</td><td/><td>##IDS__VistaLicenseDialog_DlgDesc##</td><td/><td/><td>131072</td><td>51</td><td/><td/></row>
+-		<row><td>VistaLicenseDialog</td><td>DlgTitle</td><td>Text</td><td>10</td><td>3</td><td>220</td><td>8</td><td>65539</td><td/><td>##IDS__VistaLicenseDialog_DlgTitle##</td><td/><td/><td>131072</td><td>50</td><td/><td/></row>
+-		<row><td>VistaLicenseDialog</td><td>Edit1</td><td>Edit</td><td>135</td><td>91</td><td>310</td><td>12</td><td>3</td><td/><td/><td/><td/><td>132224</td><td>301</td><td/><td/></row>
+-		<row><td>VistaLicenseDialog</td><td>MainImage</td><td>Text</td><td>0</td><td>35</td><td>120</td><td>240</td><td>65539</td><td/><td>##IDS__VistaLicenseDialog_MainImage##</td><td/><td/><td>131072</td><td>1200</td><td/><td/></row>
+-		<row><td>VistaLicenseDialog</td><td>Next</td><td>PushButton</td><td>251</td><td>285</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__VistaLicenseDialog_Next##</td><td/><td/><td>0</td><td>1</td><td/><td/></row>
+-		<row><td>VistaLicenseDialog</td><td>PushButton1</td><td>PushButton</td><td>395</td><td>113</td><td>50</td><td>14</td><td>3</td><td/><td>##NEW_STRING42##</td><td/><td/><td>131072</td><td>302</td><td/><td/></row>
+-		<row><td>VistaLicenseDialog</td><td>Text1</td><td>Text</td><td>136</td><td>49</td><td>310</td><td>22</td><td>131075</td><td/><td>##NEW_STRING41##</td><td/><td/><td>131072</td><td>901</td><td/><td/></row>
+-		<row><td>VistaLicenseDialog</td><td>Text2</td><td>Text</td><td>135</td><td>76</td><td>90</td><td>9</td><td>3</td><td/><td>##NEW_STRING43##</td><td/><td/><td>0</td><td>-1</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Back</td><td>PushButton</td><td>195</td><td>285</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__VistaOracleDialog_Back##</td><td>Next</td><td/><td>131072</td><td>12</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Cancel</td><td>PushButton</td><td>399</td><td>286</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__VistaOracleDialog_Cancel##</td><td>Text5</td><td/><td>0</td><td>9</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>ControlId_2</td><td>PushButton</td><td>0</td><td>291</td><td>50</td><td>14</td><td>2</td><td/><td>##IDS__VistaOracleDialog_C##</td><td/><td/><td>131072</td><td>2</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>DlgDesc</td><td>Text</td><td>18</td><td>15</td><td>213</td><td>19</td><td>65539</td><td/><td>##IDS__VistaOracleDialog_DlgDesc##</td><td/><td/><td>131072</td><td>51</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>DlgTitle</td><td>Text</td><td>10</td><td>3</td><td>220</td><td>8</td><td>65539</td><td/><td>##IDS__VistaOracleDialog_DlgTitle##</td><td/><td/><td>131072</td><td>50</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Edit1</td><td>Edit</td><td>136</td><td>152</td><td>120</td><td>12</td><td>2097155</td><td/><td/><td>Text6</td><td/><td>131200</td><td>303</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Edit2</td><td>Edit</td><td>137</td><td>121</td><td>120</td><td>12</td><td>3</td><td/><td/><td>Text1</td><td/><td>131200</td><td>302</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Edit3</td><td>Edit</td><td>135</td><td>91</td><td>120</td><td>12</td><td>3</td><td/><td/><td>Text2</td><td/><td>131200</td><td>301</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Edit4</td><td>Edit</td><td>136</td><td>182</td><td>120</td><td>12</td><td>2097155</td><td/><td/><td>Back</td><td/><td>131200</td><td>304</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>MainImage</td><td>Text</td><td>0</td><td>35</td><td>120</td><td>240</td><td>65539</td><td/><td>##IDS__VistaOracleDialog_MainImage##</td><td/><td/><td>131072</td><td>1200</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Next</td><td>PushButton</td><td>250</td><td>285</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__VistaOracleDialog_Next##</td><td>Cancel</td><td/><td>0</td><td>1</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Text1</td><td>Text</td><td>136</td><td>138</td><td>90</td><td>9</td><td>3</td><td/><td>##NEW_STRING66##</td><td>Edit1</td><td/><td>131072</td><td>-1</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Text2</td><td>Text</td><td>136</td><td>108</td><td>90</td><td>9</td><td>3</td><td/><td>##NEW_STRING67##</td><td>Edit2</td><td/><td>0</td><td>-1</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Text3</td><td>Text</td><td>135</td><td>76</td><td>90</td><td>9</td><td>3</td><td/><td>##NEW_STRING68##</td><td/><td/><td>0</td><td>-1</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Text4</td><td>Text</td><td>135</td><td>49</td><td>216</td><td>20</td><td>65539</td><td/><td>##NEW_STRING69##</td><td/><td/><td>0</td><td>1201</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Text5</td><td>Text</td><td>136</td><td>204</td><td>261</td><td>19</td><td>65539</td><td/><td>##NEW_STRING88##</td><td>Edit3</td><td/><td>0</td><td>1203</td><td/><td/></row>
+-		<row><td>VistaOracleDialog</td><td>Text6</td><td>Text</td><td>136</td><td>169</td><td>90</td><td>9</td><td>3</td><td/><td>##NEW_STRING18##</td><td>Edit4</td><td/><td>131072</td><td>-1</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Back</td><td>PushButton</td><td>195</td><td>285</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__VistaUserDialog_Back##</td><td>Text3</td><td/><td>131072</td><td>12</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Cancel</td><td>PushButton</td><td>400</td><td>286</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__VistaUserDialog_Cancel##</td><td>Next</td><td/><td>0</td><td>9</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>ControlId_2</td><td>PushButton</td><td>0</td><td>291</td><td>50</td><td>14</td><td>2</td><td/><td>##IDS__VistaUserDialog_C##</td><td/><td/><td>131072</td><td>2</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>DlgDesc</td><td>Text</td><td>18</td><td>15</td><td>213</td><td>19</td><td>65539</td><td/><td>##IDS__VistaUserDialog_DlgDesc##</td><td/><td/><td>131072</td><td>51</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>DlgTitle</td><td>Text</td><td>10</td><td>3</td><td>220</td><td>8</td><td>65539</td><td/><td>##IDS__VistaUserDialog_DlgTitle##</td><td/><td/><td>131072</td><td>50</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Edit1</td><td>Edit</td><td>135</td><td>147</td><td>120</td><td>12</td><td>2097155</td><td/><td/><td>Text5</td><td/><td>131200</td><td>303</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Edit2</td><td>Edit</td><td>135</td><td>118</td><td>120</td><td>12</td><td>3</td><td/><td/><td/><td/><td>131200</td><td>302</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Edit3</td><td>Edit</td><td>136</td><td>90</td><td>120</td><td>12</td><td>3</td><td/><td/><td>Text2</td><td/><td>131200</td><td>301</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Edit4</td><td>Edit</td><td>135</td><td>176</td><td>120</td><td>12</td><td>2097155</td><td/><td/><td>Cancel</td><td/><td>131200</td><td>304</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>MainImage</td><td>Text</td><td>0</td><td>35</td><td>120</td><td>240</td><td>65539</td><td/><td>##IDS__VistaUserDialog_MainImage##</td><td/><td/><td>131072</td><td>1200</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Next</td><td>PushButton</td><td>250</td><td>285</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__VistaUserDialog_Next##</td><td>Back</td><td/><td>0</td><td>1</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Text1</td><td>Text</td><td>135</td><td>135</td><td>90</td><td>9</td><td>3</td><td/><td>##NEW_STRING31##</td><td>Edit1</td><td/><td>131072</td><td>-1</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Text2</td><td>Text</td><td>135</td><td>106</td><td>90</td><td>9</td><td>3</td><td/><td>##NEW_STRING32##</td><td>Text1</td><td/><td>0</td><td>-1</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Text3</td><td>Text</td><td>135</td><td>76</td><td>90</td><td>9</td><td>3</td><td/><td>##NEW_STRING33##</td><td>Edit3</td><td/><td>0</td><td>-1</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Text4</td><td>Text</td><td>135</td><td>49</td><td>216</td><td>20</td><td>65539</td><td/><td>##NEW_STRING34##</td><td/><td/><td>0</td><td>1201</td><td/><td/></row>
+-		<row><td>VistaUserDialog</td><td>Text5</td><td>Text</td><td>135</td><td>164</td><td>90</td><td>9</td><td>3</td><td/><td>##NEW_STRING13##</td><td>Edit4</td><td/><td>131072</td><td>-1</td><td/><td/></row>
++		<row><td>DialogId_10205</td><td>ControlId_1</td><td>PushButton</td><td>250</td><td>285</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__DialogId_10205_ControlId_1##</td><td>ControlId_9</td><td/><td>131072</td><td>1</td><td/><td/></row>
++		<row><td>DialogId_10205</td><td>ControlId_12</td><td>PushButton</td><td>195</td><td>285</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__DialogId_10205_ControlId_12##</td><td>ControlId_50</td><td/><td>0</td><td>12</td><td/><td/></row>
++		<row><td>DialogId_10205</td><td>ControlId_1200</td><td>Text</td><td>0</td><td>35</td><td>120</td><td>240</td><td>3</td><td/><td>##IDS__DialogId_10205_ControlId_1200##</td><td>ControlId_202</td><td/><td>131072</td><td>1200</td><td/><td/></row>
++		<row><td>DialogId_10205</td><td>ControlId_2</td><td>PushButton</td><td>0</td><td>291</td><td>50</td><td>14</td><td>2</td><td/><td>##IDS__DialogId_10205_ControlId_2##</td><td/><td/><td>131072</td><td>2</td><td/><td/></row>
++		<row><td>DialogId_10205</td><td>ControlId_202</td><td>Text</td><td>135</td><td>147</td><td>310</td><td>40</td><td>196611</td><td/><td>##IDS__DialogId_10205_ControlId_202##</td><td>ControlId_1</td><td/><td>131072</td><td>202</td><td/><td/></row>
++		<row><td>DialogId_10205</td><td>ControlId_50</td><td>Text</td><td>135</td><td>116</td><td>310</td><td>16</td><td>65539</td><td/><td>##IDS__DialogId_10205_ControlId_50##</td><td>ControlId_1200</td><td/><td>131072</td><td>50</td><td/><td/></row>
++		<row><td>DialogId_10205</td><td>ControlId_9</td><td>PushButton</td><td>400</td><td>285</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__DialogId_10205_ControlId_9##</td><td>ControlId_12</td><td/><td>0</td><td>9</td><td/><td/></row>
++		<row><td>DialogId_12032</td><td>ControlId_1</td><td>PushButton</td><td>250</td><td>285</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__DialogId_12032_ControlId_1##</td><td>ControlId_9</td><td/><td>0</td><td>1</td><td/><td/></row>
++		<row><td>DialogId_12032</td><td>ControlId_12</td><td>PushButton</td><td>195</td><td>285</td><td>50</td><td>14</td><td>3</td><td/><td>##IDS__DialogId_12032_ControlId_12##</td><td>ControlId_1</td><td/><td>131072</td><td>12</td><td/><td/></row>
++		<row><td>DialogId_12032</td><td>ControlId_1200</td><td>Text</td><td>0</td><td>35</td><td>120</td><td>240</td><td>2</td><td/><td>##IDS__DialogId_12032_ControlId_1200##</td><td>ControlId_501</td><td/><td>131072</td><td>1200</td><td/><td/></row>
++		<row><td>DialogId_12032</td><td>ControlId_50</td><td>Text</td><td>135</td><td>50</td><td>310</td><td>16</td><td>65539</td><td/><td>##IDS__DialogId_12032_ControlId_50##</td><td>ControlId_1200</td><td/><td>131072</td><td>50</td><td/><td/></row>
++		<row><td>DialogId_12032</td><td>ControlId_501</td><td>CheckBox</td><td>135</td><td>124</td><td>310</td><td>12</td><td>3</td><td>Yes__I_want_to_view_the_ReadMe_file.</td><td>##IDS__DialogId_12032_ControlId_501##</td><td>ControlId_502</td><td/><td>131075</td><td>501</td><td/><td/></row>
++		<row><td>DialogId_12032</td><td>ControlId_502</td><td>CheckBox</td><td>135</td><td>140</td><td>310</td><td>16</td><td>3</td><td>Yes__I_want_to_launch__p_now.</td><td>##IDS__DialogId_12032_ControlId_502##</td><td>ControlId_712</td><td/><td>3</td><td>502</td><td/><td/></row>
++		<row><td>DialogId_12032</td><td>ControlId_711</td><td>Text</td><td>135</td><td>74</td><td>310</td><td>48</td><td>131075</td><td/><td>##IDS__DialogId_12032_ControlId_711##</td><td>ControlId_50</td><td/><td>131072</td><td>711</td><td/><td/></row>
++		<row><td>DialogId_12032</td><td>ControlId_712</td><td>Text</td><td>135</td><td>162</td><td>310</td><td>56</td><td>131075</td><td/><td/><td>ControlId_12</td><td/><td>131072</td><td>712</td><td/><td/></row>
++		<row><td>DialogId_12032</td><td>ControlId_9</td><td>PushButton</td><td>400</td><td>285</td><td>50</td><td>14</td><td>1</td><td/><td>##IDS__DialogId_12032_ControlId_9##</td><td>ControlId_711</td><td/><td>0</td><td>9</td><td/><td/></row>
+ 	</table>
+ 
+ 	<table name="ControlCondition">
+@@ -591,9 +563,8 @@
+ 		<col def="S72">TextStyle_</col>
+ 		<col def="I4">ISWindowStyle</col>
+ 		<col def="I4">ISResourceId</col>
+-		<row><td>VistaLicenseDialog</td><td>0</td><td>0</td><td>460</td><td>305</td><td>1</td><td>##IDS__VistaLicenseDialog##</td><td>Text1</td><td>Next</td><td>ControlId_2</td><td/><td>MSSansSerif8</td><td>-2134376256</td><td/></row>
+-		<row><td>VistaOracleDialog</td><td>0</td><td>0</td><td>460</td><td>305</td><td>1</td><td>##IDS__VistaOracleDialog##</td><td>Text5</td><td>Next</td><td>ControlId_2</td><td/><td>MSSansSerif8</td><td>-2134376256</td><td/></row>
+-		<row><td>VistaUserDialog</td><td>0</td><td>0</td><td>460</td><td>305</td><td>1</td><td>##IDS__VistaUserDialog##</td><td>Text3</td><td>Next</td><td>ControlId_2</td><td/><td>MSSansSerif8</td><td>-2134376256</td><td/></row>
++		<row><td>DialogId_10205</td><td>0</td><td>0</td><td>460</td><td>305</td><td>0</td><td>##IDS__DialogId_10205##</td><td>ControlId_1200</td><td>ControlId_1</td><td>ControlId_2</td><td/><td>Tahoma8</td><td>-2134376256</td><td>10205</td></row>
++		<row><td>DialogId_12032</td><td>0</td><td>0</td><td>460</td><td>305</td><td>0</td><td>##IDS__DialogId_12032##</td><td>ControlId_1200</td><td>ControlId_1</td><td/><td/><td>Tahoma8</td><td>-2134900544</td><td>12032</td></row>
+ 	</table>
+ 
+ 	<table name="Directory">
+@@ -3468,6 +3439,23 @@
+ 		<row><td>IDS__DestinationFolder_ChangeFolder</td><td>1033</td><td>Click Next to install to this folder, or click Change to install to a different folder.</td><td>0</td><td/><td>479668549</td></row>
+ 		<row><td>IDS__DestinationFolder_DestinationFolder</td><td>1033</td><td>{&amp;MSSansBold8}Destination Folder</td><td>0</td><td/><td>479668549</td></row>
+ 		<row><td>IDS__DestinationFolder_InstallTo</td><td>1033</td><td>Install [ProductName] to:</td><td>0</td><td>	</td><td>479668549</td></row>
++		<row><td>IDS__DialogId_10205</td><td>1033</td><td>InstallShield Wizard</td><td>0</td><td/><td>-1993699669</td></row>
++		<row><td>IDS__DialogId_10205_ControlId_1</td><td>1033</td><td>&amp;Next &gt;</td><td>0</td><td/><td>-1993699669</td></row>
++		<row><td>IDS__DialogId_10205_ControlId_12</td><td>1033</td><td>&lt; &amp;Back</td><td>0</td><td/><td>-1993699669</td></row>
++		<row><td>IDS__DialogId_10205_ControlId_1200</td><td>1033</td><td>@@10552;200</td><td>0</td><td/><td>-1993699669</td></row>
++		<row><td>IDS__DialogId_10205_ControlId_2</td><td>1033</td><td>C</td><td>0</td><td/><td>-1993699669</td></row>
++		<row><td>IDS__DialogId_10205_ControlId_202</td><td>1033</td><td>The InstallShield Wizard will install %P on your computer.  To continue, click Next.</td><td>0</td><td/><td>-1993699669</td></row>
++		<row><td>IDS__DialogId_10205_ControlId_50</td><td>1033</td><td>Welcome to the InstallShield Wizard for %P</td><td>0</td><td/><td>-1993699669</td></row>
++		<row><td>IDS__DialogId_10205_ControlId_9</td><td>1033</td><td>Cancel</td><td>0</td><td/><td>-1993699669</td></row>
++		<row><td>IDS__DialogId_12032</td><td>1033</td><td>InstallShield Wizard</td><td>0</td><td/><td>-1993730357</td></row>
++		<row><td>IDS__DialogId_12032_ControlId_1</td><td>1033</td><td>Finish</td><td>0</td><td/><td>-1993730357</td></row>
++		<row><td>IDS__DialogId_12032_ControlId_12</td><td>1033</td><td>&lt; &amp;Back</td><td>0</td><td/><td>-1993730357</td></row>
++		<row><td>IDS__DialogId_12032_ControlId_1200</td><td>1033</td><td>@@10552;200</td><td>0</td><td/><td>-1993730357</td></row>
++		<row><td>IDS__DialogId_12032_ControlId_50</td><td>1033</td><td>InstallShield Wizard Complete</td><td>0</td><td/><td>-1993730357</td></row>
++		<row><td>IDS__DialogId_12032_ControlId_501</td><td>1033</td><td>Yes, I want to view the ReadMe file.</td><td>0</td><td/><td>-1993730357</td></row>
++		<row><td>IDS__DialogId_12032_ControlId_502</td><td>1033</td><td>Yes, I want to launch %p now.</td><td>0</td><td/><td>-1993730357</td></row>
++		<row><td>IDS__DialogId_12032_ControlId_711</td><td>1033</td><td>The InstallShield Wizard has successfully installed %P.  Click Finish to exit the wizard.</td><td>0</td><td/><td>-1993730357</td></row>
++		<row><td>IDS__DialogId_12032_ControlId_9</td><td>1033</td><td>Cancel</td><td>0</td><td/><td>-1993730357</td></row>
+ 		<row><td>IDS__DisplayName_Custom</td><td>1033</td><td>Custom</td><td>0</td><td/><td>479668549</td></row>
+ 		<row><td>IDS__DisplayName_Minimal</td><td>1033</td><td>Minimal</td><td>0</td><td/><td>479668549</td></row>
+ 		<row><td>IDS__DisplayName_Typical</td><td>1033</td><td>Typical</td><td>0</td><td/><td>479668549</td></row>
+@@ -4611,6 +4599,8 @@
+ 		<row><td>SqlProgramDir</td><td>[CommonFilesFolder]Liquent\Database\</td><td/></row>
+ 		<row><td>SqlSecurityMode</td><td>SQL</td><td/></row>
+ 		<row><td>UpgradeCode</td><td>{F4E1ADA6-F27B-4C0C-93F7-E0360BC71022}</td><td/></row>
++		<row><td>Yes__I_want_to_launch__p_now.</td><td>***DO_NOT_BUILD***</td><td/></row>
++		<row><td>Yes__I_want_to_view_the_ReadMe_file.</td><td>***DO_NOT_BUILD***</td><td/></row>
+ 	</table>
+ 
+ 	<table name="PublishComponent">
+diff -r ee50f7e79b5f -r 69d832a56b0a Installer/LiquentEnterpriseServices/Script Files/Setup.Rul
+--- a/Installer/LiquentEnterpriseServices/Script Files/Setup.Rul	Thu Feb 17 09:10:36 2022 -0500
++++ b/Installer/LiquentEnterpriseServices/Script Files/Setup.Rul	Mon Feb 21 08:38:51 2022 -0500
+@@ -20,6 +20,7 @@
+ #define AMYUNI_x64_FILE		"cdintf650_64.dll"
+ #define IR_UPGRADE_MESSAGE	"This installation will upgrade LIQUENT InSight Rendering %s to %s.\r\nAny previously installed versions will be automatically uninstalled.\r\nDo you want to continue?"
+ 
++
+ STRING g_szInstallDirX86, g_szInstallDirX64;
+ ///////////////////////////////////////////////////////////////////////////////
+ //                                                                           
+@@ -33,31 +34,18 @@
+ //                                                                           
+ ///////////////////////////////////////////////////////////////////////////////
+ function OnFirstUIBefore()
+-    NUMBER nResult, nSetupType, nvSize, nUser;
+-    STRING szTitle, szMsg, szQuestion, svName, svCompany;
+-    LIST   list, listStartCopy;
+-    STRING szSetupType, svInstallFile;
+-    STRING szDatabaseType;
+-    LONG   lBufferSize;
++    NUMBER nResult, nvSize;
++    STRING szMsg;
++    STRING svInstallFile;
+     STRING szInstallHelperDLL; 
+-    OBJECT objDomainInstall, objFSO;
+     STRING szRegKey, szInstallDir, svPrevIRVersion;
+     NUMBER nvType, nRootKey;
+ 	BOOL   bvIsVCRedistInstalled;
+-	BOOL   bIsDefaultPath;
+-	 NUMBER  nvFileHandle;
++	NUMBER  nvFileHandle;	 
+ begin	
+-    // TO DO: if you want to enable background, window title, and caption bar title                                                                   
+-    // SetTitle( @PRODUCT_NAME, 24, WHITE );                                        
+-    // SetTitle( @PRODUCT_NAME, 0, BACKGROUNDCAPTION ); 	                  
+-    // Enable( FULLWINDOWMODE );						   
+-    // Enable( BACKGROUND );							  
+-    // SetColor(BACKGROUND,RGB (0, 128, 128));
+ 
+     SHELL_OBJECT_FOLDER = @PRODUCT_NAME;	   
+-    
+-    nSetupType = TYPICAL;
+-	
++    	
+ 	bvIsVCRedistInstalled = FALSE;
+     
+ 	// Get previous installation folders for clean up if it's an upgrade to a different installation folder
+@@ -92,14 +80,9 @@
+ 	// Close the file.
+ 	CloseFile (nvFileHandle);
+ 
++	Log("OnFirstUIBefore", __FILE__, __LINE__, "Starting (silent mode).");
++
+ 	
+-	if (MODE != SILENTMODE) then 
+-		Log("OnFirstUIBefore", __FILE__, __LINE__, "Starting (normal mode).");
+-	else
+-		Log("OnFirstUIBefore", __FILE__, __LINE__, "Starting (silent mode).");
+-	endif;
+-	
+-	// Get install file (if any) from command line
+ 	svInstallFile = CMDLINE;
+ 	                                       
+ 	if (svInstallFile != "" && FileExists(svInstallFile)) then 
+@@ -127,233 +110,33 @@
+ 		FeatureSelectItem(MEDIA, FEATURE_FILESYSTEM, g_bDMSFileSystemFeature);
+ 		     
+ 	else 
+-		if (MODE = SILENTMODE) then 
+-			Log("OnFirstUIBefore", __FILE__, __LINE__, "Install aborted. No install file specified.");
+-	 		abort;
+-		endif; 
++		Log("OnFirstUIBefore", __FILE__, __LINE__, "Install aborted. No install file specified.");
++	 	abort;
+ 	endif;	
+ 
+-	if (MODE != SILENTMODE) then 
+-		// See if version earlier than current installed
+-		svPrevIRVersion = GetIRVersionInstalled();
+-		if (svPrevIRVersion != "") then
+-			if (SprintfBox(MB_YESNO, IFX_PRODUCT_NAME, IR_UPGRADE_MESSAGE, svPrevIRVersion, IFX_PRODUCT_NAME) != IDYES) then
+-    			abort;
+-    		endif;
+-		endif;
+ 
+-		szInstallDir = INSTALLDIR;
+-	else
+-		// Save all properties to global variables
+-		// NOTE: We need the properties in OnFirstUIAfter to finish up
+-		// but at that point properties are no longer available.
+-		SaveProperties(); 
+-
+-		// Checks if .NET 4.5.2 or higher is installed
+-		if (CheckDotNetVersion() = FALSE) then
+-			Log("OnFirstUIBefore", __FILE__, __LINE__, "Unable to locate .NET 4.0.");
+-			abort;
+-		endif;
+-
+-		// Install VC++ redistributables
+-		InstallVCRedistributables();
+-
+-		// Uninstall IR 4.0 or greater (if installed)
+-		UninstallLiquentServices40andAbove();
+-		
+-		Log("OnFirstUIBefore", __FILE__, __LINE__, "Finishing.");
+-		
+-		nResult = UnUseDLL(szInstallHelperDLL);
+-		
+-		return 0;
+-	endif;	
+-	   
+-Dlg_SdWelcome: 
+-    szTitle = "";
+-    szMsg   = "";
+-    nResult = SdWelcome(szTitle, szMsg);
+-    if (nResult = BACK) goto Dlg_SdWelcome;
+-	
+-    szTitle   = "";
+-    svName    = "";
+-    svCompany = "";
+-    
+-Dlg_SdCustomerInformation:
+-	nResult = SdCustomerInformation(szTitle, svName, svCompany, nUser);
+-	if (nResult = BACK) goto Dlg_SdWelcome;  
+-	
+-    Log("OnFirstUIBefore", __FILE__, __LINE__, "Section=CustomerInfo; Property=Name; Value=" + svName);
+-    Log("OnFirstUIBefore", __FILE__, __LINE__, "Section=CustomerInfo; Property=Company; Value=" + svCompany);
+-	
+-Dlg_SdLicense:
+-	nResult = SdLicenseEx("", "", "", SUPPORTDIR + "license.rtf", TRUE);
+-	if (nResult = BACK) goto Dlg_SdCustomerInformation;
+-
+-/*
+-Dlg_SetupType:
+-    szTitle = "";
+-    szMsg   = "";
+-    nResult = SetupType(szTitle, szMsg, "", nSetupType, 0);
+-    if (nResult = BACK) then
+-        goto Dlg_SdAskDestPath;                                                       
+-    else
+-        nSetupType = nResult;
+-        if (nSetupType != CUSTOM) then
+-            nvSize = 0;
+-            FeatureCompareSizeRequired(MEDIA, INSTALLDIR, nvSize);
+-            if (nvSize != 0) then 
+-				Log("OnFirstUIBefore", __FILE__, __LINE__, szSdStr_NotEnoughSpace);
+-        		MessageBox(szSdStr_NotEnoughSpace, WARNING);
+-                goto Dlg_SdAskDestPath;
+-            endif;
+-            bCustom = FALSE; 
+-            goto Dlg_VistaLicenseDialog;
+-        else
+-            bCustom = TRUE;
+-        endif;
+-    endif;
+-*/                     
+-
+-	g_bAdminToolsFeature = TRUE; 
+-	g_bFrameworkFeature = TRUE;  
+-
+-/*
+-Dlg_SdFeatureTree:  
+-    szTitle    = "";
+-    szMsg      = "";
+-    //if (nSetupType = CUSTOM) then
+-        nResult = SdFeatureTree(szTitle, szMsg, INSTALLDIR, "", 2);
+-        //if (nResult = BACK) goto Dlg_SetupType; 
+-        if (nResult = BACK) goto Dlg_SdAskDestPath; 
+-    //endif;  
+-    
+-    g_bAdminToolsFeature = FALSE; 
+-    g_bFrameworkFeature = FALSE;  
+-          
+-    if (FeatureIsItemSelected(MEDIA, FEATURE_FRAMEWORK) == TRUE ) then
+-          g_bFrameworkFeature = TRUE;
+-    endif;
+-    
+-    if (FeatureIsItemSelected(MEDIA, FEATURE_ADMINTOOLS) == TRUE ) then
+-          g_bAdminToolsFeature = TRUE;
+-    endif;
+-    
+-  	if ( !g_bFrameworkFeature ) then
+-  		goto Dlg_VistaUserDialog;
+-  	endif;
+-*/
+-	                                    
+-Dlg_VistaLicenseDialog:
+-
+-	// Install VC++ redistributables
+-	if (bvIsVCRedistInstalled = FALSE) then
+-		InstallVCRedistributables();
+-		bvIsVCRedistInstalled = TRUE;
+-	endif;
+-	
+-	nResult = VistaLicenseDialog();
+-    if (nResult = BACK) then
+-        //if (!bCustom) then
+-        //    goto Dlg_SetupType;    
+-    	//else
+-        //    goto Dlg_SdFeatureTree;
+-    	//endif; 
+-		goto Dlg_SdLicense;
+-    endif;
+-    
+-Dlg_VistaUserDialog: 
+-	nResult = VistaUserDialog();
+-    if (nResult = BACK) then
+-	  	//if ( g_bAdminToolsFeature && !g_bFrameworkFeature ) then
+-	  	//	goto Dlg_SdFeatureTree;
+-	  	//else
+-	  		goto Dlg_VistaLicenseDialog;
+-	  	//endif; 
+-	endif;  	
+-    
+-  	if ( g_bAdminToolsFeature && !g_bFrameworkFeature ) then
+-  		goto Dlg_SdStartCopy; 
+-  	endif;	
+-    
+-Dlg_VistaDatabaseInfoDialog:
+-	g_szDatabaseConnectString = "";   
+-	
+-	if ( g_bFrameworkFeature == TRUE ) then
+-	
+-		Log("Dlg_VistaDatabaseInfoDialog", __FILE__, __LINE__, "Framework = true, calling db dialog");
+-		nResult = VistaOracleDialog();		
+-	else
+-		Log("Dlg_VistaDatabaseInfoDialog", __FILE__, __LINE__, "framework = false??? db dialog not called???");
+-	endif;
+-	
+-    if (nResult = BACK) goto Dlg_VistaUserDialog; 
+-
+-Dlg_SdStartCopy:
+ 	// Save all properties to global variables
+ 	// NOTE: We need the properties in OnFirstUIAfter to finish up
+ 	// but at that point properties are no longer available.
+-	SaveProperties();
+-
+-    szTitle = "";
+-    szMsg   = "";
+-    listStartCopy = ListCreate(STRINGLIST);
+-          
+-    switch(nSetupType)
+-     	case COMPLETE:
+-     		szSetupType = "Complete";
+-     	case TYPICAL:
+-     		szSetupType = "Typical";
+-     	case CUSTOM:
+-     		szSetupType = "Custom";
+-     	default:
+-     		szSetupType = "Unknown";
+-	endswitch;
+-
+-	szDatabaseType = "Oracle";
+-    
+-    //The following is an example of how to add a string(svName) to a list(listStartCopy).
+-    //eg. ListAddString(listStartCopy,svName,AFTER);
+-	ListAddString(listStartCopy, "Installation Type: " + szSetupType, AFTER);
+-	ListAddString(listStartCopy, "", AFTER);
+-	ListAddString(listStartCopy, "Destination Folder: " + INSTALLDIR, AFTER);	
+-	ListAddString(listStartCopy, "", AFTER);
+-	ListAddString(listStartCopy, "User Name: " + svName, AFTER);
+-	ListAddString(listStartCopy, "", AFTER);
+-	ListAddString(listStartCopy, "Company Name: " + svCompany, AFTER);
+-	ListAddString(listStartCopy, "", AFTER); 
+-	ListAddString(listStartCopy, "Database: " + szDatabaseType, AFTER);
+-	ListAddString(listStartCopy, "", AFTER); 
+-	
+-    nResult = SdStartCopy(szTitle, szMsg, listStartCopy);			
+-    ListDestroy(listStartCopy);
+-	
+-    if (nResult = BACK) then  
+-	  	if ( g_bAdminToolsFeature && !g_bFrameworkFeature ) then
+-	  		goto Dlg_VistaUserDialog;
+-	  	else
+-	  		goto Dlg_VistaDatabaseInfoDialog;
+-	  	endif;
+-    endif;
+-    
+-    ProcessDefaultPath(g_szInstallDirX86, g_szInstallDirX64);
+-
+-    // setup default status
+-    Enable(STATUSEX);
++	SaveProperties(); 
+ 
+ 	// Checks if .NET 4.5.2 or higher is installed
+ 	if (CheckDotNetVersion() = FALSE) then
++		Log("OnFirstUIBefore", __FILE__, __LINE__, "Unable to locate .NET 4.0.");
+ 		abort;
+ 	endif;
+ 
++	// Install VC++ redistributables
++	InstallVCRedistributables();
+ 
+-	//Uninstall IR 4.0 or greater (if installed)
++	// Uninstall IR 4.0 or greater (if installed)
+ 	UninstallLiquentServices40andAbove();
+-	
++		
++	Log("OnFirstUIBefore", __FILE__, __LINE__, "Finishing.");
++		
+ 	nResult = UnUseDLL(szInstallHelperDLL);
+-	
+-	Log("OnFirstUIBefore", __FILE__, __LINE__, "Finishing.");
+- 
+-    return 0;
++		
++	return 0;
+ end;
+ 
+ ///////////////////////////////////////////////////////////////////////////////
+@@ -367,8 +150,7 @@
+ //
+ ///////////////////////////////////////////////////////////////////////////////
+ function OnFirstUIAfter()
+-    STRING szTitle, szMsg1, szMsg2, szOption1, szOption2;
+-    NUMBER bOpt1, bOpt2, nResult;
++    NUMBER nResult;
+     STRING szInstallHelperDLL, szLogMessage; 
+ begin			
+ 	szInstallHelperDLL = WINDIR + "InstallHelper.dll";
+@@ -381,25 +163,14 @@
+ 	   
+     Disable(STATUSEX);
+     
+-	//create the folder item shortcuts
+-	if (MODE != SILENTMODE) then
+-	 	CreateVistaShortcuts("Liquent");
+-	else	                                                                  
+-		Sprintf(szLogMessage, "Product program menu: '%s'.", g_szShortcutsFolder); 
+-		Log("OnFirstUIAfter", __FILE__, __LINE__, szLogMessage);
++	//create the folder item shortcuts                                                                 
++	Sprintf(szLogMessage, "Product program menu: '%s'.", g_szShortcutsFolder); 
++	Log("OnFirstUIAfter", __FILE__, __LINE__, szLogMessage);
+ 		 
+-		if( g_szShortcutsFolder != "" ) then 
+-			CreateVistaShortcuts(g_szShortcutsFolder); 
+-		else
+-		    CreateVistaShortcuts("Liquent");
+-		endif;
+-	endif;
+-
+-	if (MODE != SILENTMODE) then
+-	    bOpt1  = FALSE;
+-	    bOpt2  = FALSE;
+-	    szMsg1 = SdLoadString(IFX_SDFINISH_MSG1);
+-	    SdFinishEx(szTitle, szMsg1, szMsg2, szOption1, szOption2, bOpt1, bOpt2);
++	if( g_szShortcutsFolder != "" ) then 
++		CreateVistaShortcuts(g_szShortcutsFolder); 
++	else
++		   CreateVistaShortcuts("Liquent");
+ 	endif;
+ 
+  	nResult = UnUseDLL(szInstallHelperDLL);   
+@@ -420,21 +191,15 @@
+ //
+ ///////////////////////////////////////////////////////////////////////////////
+ function OnMaintUIBefore()
+-	NUMBER nResult, nType;
+-	STRING szTitle, szMsg, svDir, svResult, szCaption, svIRSLocation;
+-    STRING szInstallHelperDLL, szCommandLine;
++	NUMBER nResult;
++	STRING svIRSLocation;
++    STRING szInstallHelperDLL;
+     STRING szDatabaseType, szLogMessage;
+     STRING szInstallDirX86, szInstallDirX64;
+     LONG   lBufferSize;
+ begin
+-	// TO DO: if you want to enable background, window title, and caption bar title   								
+-	// SetTitle( @PRODUCT_NAME, 24, WHITE );					
+-	// SetTitle( @PRODUCT_NAME, 0, BACKGROUNDCAPTION );  			
+-	// SetColor(BACKGROUND,RGB (0, 128, 128));					
+-	// Enable( FULLWINDOWMODE );						
+-	// Enable( BACKGROUND );							
++						
+ 
+-Dlg_Start:
+ 	// Copy install helper for later use
+ 	// NOTE: Using FSO instead of InstallShield's CopyFile. If CopyFile
+ 	// is used then DLL is deleted at uninstall time but we need DLL afterwards.
+@@ -447,103 +212,41 @@
+ 
+ 	Log("OnMaintUIBefore", __FILE__, __LINE__, "Starting.");
+ 	
+-	Disable(BACKBUTTON);
+-	nType = SdWelcomeMaint(szTitle, szMsg, MODIFY);
+-	g_nInstallType = nType;
+-	Enable(BACKBUTTON);
+ 	
+ 	ProcessDefaultPath(szInstallDirX86, szInstallDirX64);
+ 	INSTALLDIR = szInstallDirX86;
+-	
+-	if (nType = REMOVEALL) then
+-		svResult = SdLoadString(IFX_MAINTUI_MSG);
+-		szCaption = SdLoadString(IFX_ONMAINTUI_CAPTION);
+-		nResult = SprintfBox(MB_OKCANCEL, szCaption, "%s", svResult);
+-		if (nResult = IDCANCEL) goto Dlg_Start;
+-		
+-		//Check installation path for IRS	
+-		svIRSLocation = GetIRInstallationPath(INSIGHT_RENDERING_SERVICE_440_PRODUCT_GUID);
+-		if( INSTALLDIR % svIRSLocation ) then
+-			if( MODE != SILENTMODE ) then
+-				MessageBox("InSight Rendering Service is installed to the same folder as InSight Rendering or to a subfolder of InSight Rendering. Please remove it first.", SEVERE);
+-			endif;
+ 			
+-			Sprintf(szLogMessage, "InSight Rendering Service is installed to the same folder as InSight Rendering or to a subfolder of InSight Rendering. Please remove it first. IRS folder = %s, IR folder = %s",
+-						svIRSLocation, INSTALLDIR);
+-			Log("OnMaintUIBefore", __FILE__, __LINE__, szLogMessage);
+-    		abort;
+-		endif;		 
++	//Check installation path for IRS	
++	svIRSLocation = GetIRInstallationPath(INSIGHT_RENDERING_SERVICE_440_PRODUCT_GUID);
++	if( INSTALLDIR % svIRSLocation ) then
++		Sprintf(szLogMessage, "InSight Rendering Service is installed to the same folder as InSight Rendering or to a subfolder of InSight Rendering. Please remove it first. IRS folder = %s, IR folder = %s",
++				svIRSLocation, INSTALLDIR);
++		Log("OnMaintUIBefore", __FILE__, __LINE__, szLogMessage);
++    	abort;
+ 	endif;
+ 
+-	nResult = NEXT; 
+-
+-//Dlg_SdFeatureTree:
+-	if (nType = MODIFY) then
+-		szTitle = "";
+-		szMsg = "";
+-		//nResult = SdFeatureTree(szTitle, szMsg, INSTALLDIR, "", 2);
+-		//if (nResult = BACK) goto Dlg_Start; 
+-		
+-		FeatureSelectItem(MEDIA, FEATURE_FRAMEWORK, TRUE);
+-		FeatureSelectItem(MEDIA, FEATURE_ADMINTOOLS, TRUE);
+-	endif; 
++	nResult = NEXT;
++	
++	StopNTService("BusinessServiceServer");
+ 	
+-	if (!StopNTService("BusinessServiceServer")) then 
+-  		//if (MODE != SILENTMODE) then
+-	    //	SprintfBox(MB_OK | MB_ICONEXCLAMATION, "Error", "Unable to stop BusinessServiceServer."); 
+-	    //endif;	
++	FeatureRemoveAll(); 
++	if (ServiceExistsService("BusinessServiceServer")) then 
++		// Remove BusinessServiceServer as NT Service
++		if (LaunchAppAndWait(INSTALLDIR + "BusinessServiceServer.exe", "/unregserver", LAAW_OPTION_WAIT) < 0) then 
++		Log("OnMaintUIBefore", __FILE__, __LINE__, "Unable to unregister BusinessServiceServer.");			  		
++		endif; 
+ 	endif; 
+-
+-	switch(nType)
+-		case REMOVEALL: 
+-			FeatureRemoveAll(); 
+-			if (ServiceExistsService("BusinessServiceServer")) then 
+-				// Remove BusinessServiceServer as NT Service
+-			  	if (LaunchAppAndWait(INSTALLDIR + "BusinessServiceServer.exe", "/unregserver", LAAW_OPTION_WAIT) < 0) then 
+-					Log("OnMaintUIBefore", __FILE__, __LINE__, "Unable to unregister BusinessServiceServer.");
+-			  		if (MODE != SILENTMODE) then
+-			        	MessageBox("Unable to unregister BusinessServiceServer.", WARNING);
+-			        endif;	
+-			  	endif; 
+-			endif; 
+ 			
+-			try 
+-				// Kill leftover LES processes 
+-				InstallHelper.KillProcesses();
+-			catch
+-				Sprintf(szLogMessage, "Unable to kill processes.\n" +
+-						"Error Number: %d\nError Description: %s",
+-						Err.Number, Err.Description);
+-				Log("OnMaintUIBefore", __FILE__, __LINE__, szLogMessage);
+-			endcatch;
+-
+-			UninstallAmyuniPrinter(AMYUNI_DRIVER_NAME, AMYUNI_x86_FILE, AMYUNI_x64_FILE);
++	try 
++		// Kill leftover LES processes 
++		InstallHelper.KillProcesses();
++	catch
++		Sprintf(szLogMessage, "Unable to kill processes.\n" + "Error Number: %d\nError Description: %s", Err.Number, Err.Description);
++		Log("OnMaintUIBefore", __FILE__, __LINE__, szLogMessage);
++	endcatch;
+ 
+-		case REPAIR:    
+-			FeatureReinstall();
+-			
+-		case MODIFY:
+-			Dlg_VistaLicenseDialog:
+-			  	if (FeatureIsItemSelected(MEDIA, FEATURE_FRAMEWORK) = FALSE) then
+-			  	 	goto Dlg_VistaDatabaseInfoDialog;
+-			  	endif;
+-				nResult = VistaLicenseDialog();
+-			    //if (nResult = BACK) goto Dlg_SdFeatureTree;
+-			    if (nResult = BACK) goto Dlg_Start;  
+-			    
+-			Dlg_VistaUserDialog: 
+-				nResult = VistaUserDialog();
+-			    if (nResult = BACK) goto Dlg_VistaLicenseDialog;
+-			    
+-			Dlg_VistaDatabaseInfoDialog:
+-				nResult = VistaOracleDialog(); 
+-			    if (nResult = BACK) goto Dlg_VistaUserDialog; 
+-
+-			// Save all properties to global variables
+-			// NOTE: We need the properties in OnMaintUIAfter to finish up
+-			// but at that point properties are no longer available.
+-			SaveProperties();
+-	endswitch;
++	UninstallAmyuniPrinter(AMYUNI_DRIVER_NAME, AMYUNI_x86_FILE, AMYUNI_x64_FILE);	
++	
+ 	
+ 	Log("OnMaintUIBefore", __FILE__, __LINE__, "Finishing.");
+ 	
+@@ -578,41 +281,20 @@
+ 	Disable(STATUSEX); 
+ 	
+ 	Log("OnMaintUIAfter", __FILE__, __LINE__, "Starting."); 
+-	
+-	if (g_nInstallType = REMOVEALL) then 
+-		if (MODE != SILENTMODE) then
+-	  		SdShowMsg("Performing uninstall cleanup, please wait.", TRUE);
+-	  	endif;	
+-		try 
+-			// Cleanup (i.e., files, folders, printers, etc.)
+-			InstallHelper.CleanupInstall(INSTALLDIR);
+-		catch
+-			Sprintf(szLogMessage, "Unable to perform uninstall cleanup.\n" +
+-					"Error Number: %d\nError Description: %s",
+-					Err.Number, Err.Description);
+-			Log("OnMaintUIAfter", __FILE__, __LINE__, szLogMessage);
+-		endcatch;
+-		if (MODE != SILENTMODE) then
+-	  		SdShowMsg("", FALSE);
+-	  	endif;  
+-	elseif (g_nInstallType = MODIFY) then
+-		// Finish installing Vista               
+-		FinishInstalling(TRUE);
+-	endif;         
++		
++	try 
++		// Cleanup (i.e., files, folders, printers, etc.)
++		InstallHelper.CleanupInstall(INSTALLDIR);
++	catch
++		Sprintf(szLogMessage, "Unable to perform uninstall cleanup.\n" + "Error Number: %d\nError Description: %s",	Err.Number, Err.Description);
++		Log("OnMaintUIAfter", __FILE__, __LINE__, szLogMessage);
++	endcatch;        
+ 	
+ 	Log("OnMaintUIAfter", __FILE__, __LINE__, "Finishing.");
+ 	
+ 	nResult = UnUseDLL(szInstallHelperDLL);  
+ 	
+-	if (g_nInstallType = REMOVEALL) then 
+-	  	FileDelete(szInstallHelperDLL);
+-	endif;
+-	
+-	bOpt1   = FALSE;
+-	bOpt2   = FALSE;
+-	szMsg1  = SdLoadString(IFX_SDFINISH_MAINT_MSG1);
+-	szTitle = SdLoadString(IFX_SDFINISH_MAINT_TITLE);
+-	SdFinishEx(szTitle, szMsg1, szMsg2, szOption1, szOption2, bOpt1, bOpt2);
++	FileDelete(szInstallHelperDLL);
+ end;  
+ 
+ ///////////////////////////////////////////////////////////////////////////
